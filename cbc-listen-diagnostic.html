@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CBC Listen">
+<title>CBC Listen</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #111111;
+    --panel: #202020;
+    --white: #ffffff;
+    --muted: #d0d0d0;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+    --cbc: #e60505;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; width: 100%; min-height: 100%; background: var(--bg); color: var(--white);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    padding: max(18px, env(safe-area-inset-top)) 20px max(18px, env(safe-area-inset-bottom));
+  }
+  button { font: inherit; color: inherit; touch-action: manipulation; }
+  .app { width: 100%; max-width: 620px; min-height: calc(100vh - 36px); min-height: calc(100dvh - 36px);
+    margin: 0 auto; display: flex; flex-direction: column; }
+  .screen { display: none; flex: 1; flex-direction: column; align-items: center; }
+  .screen.active { display: flex; }
+  header { text-align: center; width: 100%; padding-top: 12px; }
+  .brand { display: inline-block; background: var(--cbc); border-radius: 999px; padding: 8px 18px;
+    font-size: 1.05rem; font-weight: 900; letter-spacing: .08em; }
+  h1 { margin: 15px 0 0; font-size: clamp(2rem, 8vw, 2.7rem); line-height: 1.12; font-weight: 850; }
+  .subtitle { color: var(--muted); font-size: 1.2rem; margin-top: 10px; min-height: 1.5em; text-align: center; }
+  .home-grid { width: 100%; flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    align-content: center; padding: 28px 0; }
+  .home-tile { border: 4px solid white; border-radius: 24px; min-height: 0; aspect-ratio: 1 / 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    text-align: center; padding: 12px; font-size: clamp(1.15rem, 4.5vw, 1.55rem); font-weight: 900;
+    line-height: 1.15; box-shadow: 0 8px 22px #0009; }
+  .home-tile:active, .home-button:active, .play-button:active { transform: scale(.97); }
+  .tile-radio { background: #b91c1c; }
+  .tile-podcast { background: #176b50; }
+  .tile-icon { width: 56px; height: 56px; }
+  .player-header { margin-bottom: 10px; }
+  .episode { width: 100%; background: var(--panel); border-radius: 18px; padding: 14px 16px;
+    margin: 22px 0 4px; text-align: center; }
+  .episode-label { color: #d5d5d5; font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  .episode-title { font-size: 1.15rem; font-weight: 750; line-height: 1.3; margin-top: 8px; }
+  .play-button { width: min(66vw, 310px); height: min(66vw, 310px); min-width: 220px; min-height: 220px;
+    max-width: 310px; max-height: 310px; flex-shrink: 0; border: 7px solid white; border-radius: 50%;
+    background: var(--green); display: flex; flex-direction: column; justify-content: center; align-items: center;
+    gap: 12px; margin: auto 0 18px; box-shadow: 0 12px 30px #0009; transition: transform .1s, background .2s; }
+  .play-button.is-playing { background: var(--red); }
+  .play-button.is-loading { background: var(--amber); }
+  .play-button svg { width: 82px; height: 82px; fill: white; }
+  .play-label { font-size: clamp(2.3rem, 9vw, 3.1rem); font-weight: 950; letter-spacing: .04em; }
+  .status { min-height: 2.8em; text-align: center; color: var(--muted); font-size: 1.2rem; font-weight: 650;
+    line-height: 1.3; margin: 0 0 18px; }
+  .status.live { color: #4ade80; }
+  .home-button { width: 100%; min-height: 68px; border: 3px solid white; border-radius: 18px;
+    background: #333; font-size: 1.35rem; font-weight: 900; margin-top: auto; margin-bottom: 4px; }
+  .home-button span { margin-right: 10px; }
+  footer { color: #a8a8a8; text-align: center; font-size: .95rem; padding-top: 12px; }
+  @media (max-height: 650px) {
+    .home-grid { gap: 10px; padding: 16px 0; }
+    .home-tile { font-size: 1.05rem; gap: 8px; }
+    .tile-icon { width: 42px; height: 42px; }
+    .play-button { width: min(48vw, 230px); height: min(48vw, 230px); min-width: 190px; min-height: 190px; }
+    .play-button svg { width: 65px; height: 65px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section id="homeScreen" class="screen active" aria-label="Home">
+    <header>
+      <div class="brand">CBC LISTEN</div>
+      <h1>What would you like to hear?</h1>
+      <div class="subtitle">Choose one button</div>
+    </header>
+    <main class="home-grid">
+      <button class="home-tile tile-radio" data-open="radio">
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M7 7 17 3M7 11h10M7 15h.01M11 15h.01M15 15h2"/></svg>
+        <span>CBC RADIO<br>ONE</span>
+      </button>
+      <button class="home-tile tile-podcast" data-open="quirks">
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="12" width="4" height="8" rx="2"/><rect x="17" y="12" width="4" height="8" rx="2"/></svg>
+        <span>QUIRKS &<br>QUARKS</span>
+      </button>
+      <button class="home-tile tile-podcast" data-open="whitecoat">
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v5a4 4 0 0 0 8 0V4M8 4v5M12 4v5M16 14a4 4 0 1 0 8 0v-2"/><path d="M20 12v-2a2 2 0 0 0-4 0v2"/></svg>
+        <span>WHITE COAT,<br>BLACK ART</span>
+      </button>
+      <button class="home-tile tile-podcast" data-open="ideas">
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4M8 14c-1.5-1.2-2.5-3-2.5-5a6.5 6.5 0 0 1 13 0c0 2-.9 3.8-2.5 5-.8.7-1 1.2-1 2h-6c0-.8-.2-1.3-1-2Z"/></svg>
+        <span>IDEAS</span>
+      </button>
+    </main>
+    <footer>Tap a button to listen</footer>
+  </section>
+
+  <section id="playerScreen" class="screen" aria-label="Audio player">
+    <header class="player-header">
+      <div class="brand">CBC LISTEN</div>
+      <h1 id="pageTitle">CBC Radio One</h1>
+      <div id="pageSubtitle" class="subtitle">Vancouver 690 AM</div>
+    </header>
+    <div id="episodeBox" class="episode" hidden>
+      <div class="episode-label">Latest episode</div>
+      <div id="episodeTitle" class="episode-title">Finding the latest episode…</div>
+    </div>
+    <button id="toggleBtn" class="play-button" type="button" aria-label="Play">
+      <svg id="playIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="stopIcon" viewBox="0 0 24 24" aria-hidden="true" style="display:none"><path d="M6 6h12v12H6z"/></svg>
+      <span id="btnLabel" class="play-label">PLAY</span>
+    </button>
+    <div id="status" class="status" aria-live="polite">Tap PLAY to listen</div>
+    <button id="homeBtn" class="home-button" type="button"><span aria-hidden="true">⌂</span> HOME</button>
+    <footer id="playerFooter">CBC Radio One • Vancouver</footer>
+  </section>
+</div>
+
+<audio id="audio" preload="none" playsinline></audio>
+
+<script>
+(() => {
+  const RADIO_STREAM = "https://cbcradiolive.akamaized.net/hls/live/2041050/ES_R1PVC/master.m3u8";
+  const SHOWS = {
+    quirks: {
+      title: "Quirks & Quarks",
+      subtitle: "CBC Science Podcast",
+      feed: "https://www.cbc.ca/podcasting/includes/quirksaio.xml"
+    },
+    whitecoat: {
+      title: "White Coat, Black Art",
+      subtitle: "CBC Health Podcast",
+      feed: "https://www.cbc.ca/podcasting/includes/whitecoat.xml"
+    },
+    ideas: {
+      title: "Ideas",
+      subtitle: "CBC Ideas Podcast",
+      feed: "https://www.cbc.ca/podcasting/includes/ideas.xml"
+    }
+  };
+
+  const homeScreen = document.getElementById("homeScreen");
+  const playerScreen = document.getElementById("playerScreen");
+  const audio = document.getElementById("audio");
+  const toggleBtn = document.getElementById("toggleBtn");
+  const btnLabel = document.getElementById("btnLabel");
+  const playIcon = document.getElementById("playIcon");
+  const stopIcon = document.getElementById("stopIcon");
+  const statusText = document.getElementById("status");
+  const pageTitle = document.getElementById("pageTitle");
+  const pageSubtitle = document.getElementById("pageSubtitle");
+  const episodeBox = document.getElementById("episodeBox");
+  const episodeTitle = document.getElementById("episodeTitle");
+  const playerFooter = document.getElementById("playerFooter");
+
+  let currentKey = "radio";
+  let currentEpisodeUrl = "";
+  let wantPlaying = false;
+  let feedRequest = 0;
+
+  function setState(state, message) {
+    toggleBtn.classList.remove("is-playing", "is-loading");
+    statusText.classList.remove("live");
+    if (state === "playing") {
+      toggleBtn.classList.add("is-playing");
+      toggleBtn.setAttribute("aria-label", "Stop audio");
+      btnLabel.textContent = "STOP";
+      playIcon.style.display = "none";
+      stopIcon.style.display = "block";
+      statusText.textContent = message || "Playing now";
+      statusText.classList.add("live");
+    } else if (state === "loading") {
+      toggleBtn.classList.add("is-loading");
+      toggleBtn.setAttribute("aria-label", "Connecting");
+      btnLabel.textContent = "WAIT";
+      playIcon.style.display = "none";
+      stopIcon.style.display = "block";
+      statusText.textContent = message || "Connecting…";
+    } else {
+      toggleBtn.setAttribute("aria-label", "Play audio");
+      btnLabel.textContent = "PLAY";
+      playIcon.style.display = "block";
+      stopIcon.style.display = "none";
+      statusText.textContent = message || "Tap PLAY to listen";
+    }
+  }
+
+  function stopAudio() {
+    wantPlaying = false;
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    setState("stopped", "Stopped");
+  }
+
+  function showPlayer(key) {
+    stopAudio();
+    currentKey = key;
+    homeScreen.classList.remove("active");
+    playerScreen.classList.add("active");
+    currentEpisodeUrl = "";
+    feedRequest++;
+
+    if (key === "radio") {
+      pageTitle.textContent = "CBC Radio One";
+      pageSubtitle.textContent = "Vancouver 690 AM";
+      episodeBox.hidden = true;
+      playerFooter.textContent = "CBU 690 AM • 88.1 FM";
+      setState("stopped", "Tap PLAY to listen live");
+      return;
+    }
+
+    const show = SHOWS[key];
+    pageTitle.textContent = show.title;
+    pageSubtitle.textContent = show.subtitle;
+    episodeBox.hidden = false;
+    episodeTitle.textContent = "Finding the latest episode…";
+    playerFooter.textContent = "CBC Podcast";
+    setState("loading", "Loading the latest episode…");
+    loadLatestEpisode(key);
+  }
+
+  async function loadLatestEpisode(key) {
+    const requestId = feedRequest;
+    const show = SHOWS[key];
+
+    // CBC's RSS feeds are valid public feeds, but browsers normally cannot
+    // read them directly from a local file because of cross-origin rules.
+    // Try the CBC feed directly, then two public feed-fetch routes.
+    const feedUrl = show.feed;
+    const feedRoutes = [
+      feedUrl,
+      "https://proxy.cors.dev/" + feedUrl,
+      "https://api.allorigins.win/raw?url=" + encodeURIComponent(feedUrl)
+    ];
+
+    let lastProblem = "The podcast feed could not be reached.";
+
+    for (const route of feedRoutes) {
+      try {
+        const response = await fetch(route, { cache: "no-store" });
+        if (!response.ok) {
+          lastProblem = "Feed service returned HTTP " + response.status + ".";
+          continue;
+        }
+
+        const xmlText = await response.text();
+        const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+        if (xml.getElementsByTagName("parsererror").length) {
+          lastProblem = "The feed response was not readable XML.";
+          continue;
+        }
+
+        // Use localName so tags work whether or not CBC adds XML namespaces.
+        const descendants = (node) => Array.from(node.getElementsByTagName("*"));
+        const findTag = (node, localName) =>
+          descendants(node).find(el => (el.localName || el.nodeName.split(":").pop()).toLowerCase() === localName.toLowerCase()) || null;
+        const getText = (node, localName) => findTag(node, localName)?.textContent?.trim() || "";
+
+        const items = Array.from(xml.getElementsByTagName("item"));
+        if (!items.length) {
+          lastProblem = "The feed opened, but it contained no podcast episodes.";
+          continue;
+        }
+
+        // Select the newest item that actually has an audio enclosure.
+        // This avoids failing if CBC places a non-audio notice at the top.
+        const playableItems = items.map(item => {
+          const tags = descendants(item);
+          const enclosure = tags.find(el =>
+            (el.localName || "").toLowerCase() === "enclosure"
+          );
+          const mediaContent = tags.find(el =>
+            (el.localName || "").toLowerCase() === "content" &&
+            (el.getAttribute("url") || el.getAttribute("href"))
+          );
+          const enclosureLink = tags.find(el =>
+            (el.localName || "").toLowerCase() === "link" &&
+            (el.getAttribute("rel") || "").toLowerCase() === "enclosure"
+          );
+
+          const audioUrl =
+            enclosure?.getAttribute("url") ||
+            enclosure?.getAttribute("href") ||
+            mediaContent?.getAttribute("url") ||
+            mediaContent?.getAttribute("href") ||
+            enclosureLink?.getAttribute("href") ||
+            "";
+
+          const dateText = getText(item, "pubDate") || getText(item, "published") || getText(item, "date");
+          const dateValue = Date.parse(dateText) || 0;
+          return {
+            audioUrl,
+            title: getText(item, "title") || "Latest episode",
+            dateValue
+          };
+        }).filter(item => item.audioUrl);
+
+        if (!playableItems.length) {
+          lastProblem = "The feed opened, but no episode audio link was found.";
+          continue;
+        }
+
+        playableItems.sort((a, b) => b.dateValue - a.dateValue);
+        const latest = playableItems[0];
+
+        if (requestId !== feedRequest || currentKey !== key) return;
+
+        currentEpisodeUrl = latest.audioUrl;
+        episodeTitle.textContent = latest.title;
+        setState("stopped", "Latest episode ready. Tap PLAY to listen");
+        return;
+      } catch (error) {
+        lastProblem = error && error.message ? error.message : "A network or browser access error occurred.";
+      }
+    }
+
+    if (requestId !== feedRequest || currentKey !== key) return;
+    currentEpisodeUrl = "";
+    episodeTitle.textContent = "Could not load the latest episode.";
+    setState("stopped", lastProblem + " Please try again.");
+    console.warn("CBC podcast feed error for " + show.title + ":", lastProblem);
+  }
+
+  async function startAudio() {
+    if (wantPlaying) return;
+    if (currentKey !== "radio" && !currentEpisodeUrl) {
+      setState("loading", "Loading the latest episode…");
+      await loadLatestEpisode(currentKey);
+      if (!currentEpisodeUrl) return;
+    }
+    wantPlaying = true;
+    setState("loading", "Connecting…");
+    audio.src = currentKey === "radio" ? RADIO_STREAM : currentEpisodeUrl;
+    audio.load();
+    try {
+      await audio.play();
+    } catch (error) {
+      wantPlaying = false;
+      setState("stopped", "Unable to start. Please tap PLAY again.");
+    }
+  }
+
+  document.querySelectorAll("[data-open]").forEach(button => {
+    button.addEventListener("click", () => showPlayer(button.dataset.open));
+  });
+
+  toggleBtn.addEventListener("click", () => {
+    if (wantPlaying) stopAudio();
+    else startAudio();
+  });
+
+  document.getElementById("homeBtn").addEventListener("click", () => {
+    stopAudio();
+    feedRequest++;
+    playerScreen.classList.remove("active");
+    homeScreen.classList.add("active");
+  });
+
+  audio.addEventListener("playing", () => {
+    if (wantPlaying) setState("playing", currentKey === "radio" ? "Live on air" : "Playing latest episode");
+  });
+  audio.addEventListener("waiting", () => {
+    if (wantPlaying) setState("loading", "Buffering…");
+  });
+  audio.addEventListener("ended", () => {
+    wantPlaying = false;
+    setState("stopped", "Episode finished");
+  });
+  audio.addEventListener("error", () => {
+    if (wantPlaying) {
+      wantPlaying = false;
+      setState("stopped", "The episode could not start. Please try again.");
+    }
+  });
+
+  if ("mediaSession" in navigator && "MediaMetadata" in window) {
+    navigator.mediaSession.setActionHandler("play", startAudio);
+    navigator.mediaSession.setActionHandler("pause", stopAudio);
+    navigator.mediaSession.setActionHandler("stop", stopAudio);
+  }
+})();
+</script>
+</body>
+</html>
